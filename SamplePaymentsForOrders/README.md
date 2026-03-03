@@ -85,7 +85,7 @@ And also there we should implement refresh tokens in production, but for simplic
 
 User registration is a two-step process:
 
-1. **Send OTP** — a 6-digit code is generated and (in production) sent to the user's phone number. Sending is protected by a **Redis distributed lock** (`Medallion.Threading`) to prevent concurrent OTP sends for the same phone number.
+1. **Send OTP** — a 6-digit code is generated and (in production) sent to the user's phone number. Sending is protected by a **Redis distributed lock** to prevent concurrent OTP sends for the same phone number.
 2. **Register** — the user submits the OTP along with their details. The OTP record is locked with `SELECT ... FOR UPDATE` during validation to prevent race conditions on the attempt counter.
 
 OTP codes expire after 5 minutes. A phone number is limited to **3 OTP requests per 30 minutes**. After **5 failed attempts**, the OTP is locked for 30 minutes.
