@@ -4,7 +4,7 @@ namespace SamplePaymentsForOrders.Services.Abstractions;
 
 public interface IPaymentService
 {
-    Task<CreatePaymentResponseDto> Create(CreatePaymentRequestDto paymentRequest, CancellationToken cancellationToken);
+    Task<CreatePaymentResponseDto> Create(CreatePaymentRequestDto paymentRequest, int millisecondsDelay, CancellationToken cancellationToken);
     
     Task ConfirmPaymentAsync(Guid paymentId, CancellationToken cancellationToken);
     

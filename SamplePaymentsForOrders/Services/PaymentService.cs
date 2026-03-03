@@ -13,7 +13,7 @@ public class PaymentService(
     IAuthenticatedService authenticatedService,
     IMockPaymentProviderService mockPaymentProviderService) : IPaymentService
 {
-    public async Task<CreatePaymentResponseDto> Create(CreatePaymentRequestDto paymentRequest, CancellationToken cancellationToken)
+    public async Task<CreatePaymentResponseDto> Create(CreatePaymentRequestDto paymentRequest, int millisecondsDelay,  CancellationToken cancellationToken)
     {
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         var order = await dbContext.Orders
@@ -21,8 +21,6 @@ public class PaymentService(
                         .FirstOrDefaultAsync(o => o.Id == paymentRequest.OrderId 
                                                   && o.UserId == authenticatedService.UserId, cancellationToken)
                     ?? throw new Exception("Order not found");
-        
-        await Task.Delay(1000 * 60, cancellationToken); // Simulate long-running payment process
 
         if (order.Status != OrderStatus.Created)
         {
@@ -62,8 +60,6 @@ public class PaymentService(
             .FirstOrDefaultAsync(p => p.Id == paymentId 
                                       && p.UserId == authenticatedService.UserId, cancellationToken) 
                       ?? throw new AppLogicException( ExceptionStatus.NotFound, "Payment not found");
-        
-        await Task.Delay(1000 * 60, cancellationToken); // Simulate long-running payment process
 
         if (payment.Status != PaymentStatus.Pending)
         {

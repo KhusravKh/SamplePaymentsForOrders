@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using Medallion.Threading;
+using Medallion.Threading.Redis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +12,7 @@ using SamplePaymentsForOrders.Common;
 using SamplePaymentsForOrders.Contexts;
 using SamplePaymentsForOrders.Services;
 using SamplePaymentsForOrders.Services.Abstractions;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +27,26 @@ builder.Services.AddSingleton<IMockPaymentProviderService, MockPaymentProviderSe
 
 builder.Services.AddDbContext<ApplicationDbContext>(o
     => o.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(_
+    =>
+{
+    var configuration = ConfigurationOptions.Parse(
+        builder.Configuration.GetConnectionString("RedisDefaultConnection")!,
+        true);
+    
+    configuration.AbortOnConnectFail = false;
+    configuration.ConnectRetry = 3;
+    configuration.ReconnectRetryPolicy = new ExponentialRetry(5000);
+
+    return ConnectionMultiplexer.Connect(configuration);
+});
+
+builder.Services.AddSingleton<IDistributedLockProvider>(sp =>
+{
+    var connectionMultiplexer = sp.GetRequiredService<IConnectionMultiplexer>();
+    return new RedisDistributedSynchronizationProvider(connectionMultiplexer.GetDatabase());
+});
 
 builder.Services.AddOptions<JwtConfig>()
     .Bind(builder.Configuration.GetSection("Jwt"))
@@ -56,7 +79,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddFixedWindowLimiter("fixed", o =>
     {
-        o.PermitLimit = 10;
+        o.PermitLimit = 60;
         o.Window = TimeSpan.FromMinutes(1);
         o.QueueLimit = 10;
         o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
@@ -69,9 +92,9 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: userId,
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,
+                PermitLimit = 30,
                 Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 1,
+                QueueLimit = 5,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
             });
     });
@@ -83,9 +106,9 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: userIp,
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 5,
+                PermitLimit = 30,
                 Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 1,
+                QueueLimit = 5,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst
             });
     });

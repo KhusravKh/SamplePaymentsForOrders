@@ -15,7 +15,7 @@ public class PaymentsController(IPaymentService paymentService) : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePaymentRequestDto createPaymentRequestDto, CancellationToken cancellationToken)
     {
-        var response = await paymentService.Create(createPaymentRequestDto, cancellationToken);
+        var response = await paymentService.Create(createPaymentRequestDto, 1000 * 60, cancellationToken);
         return Ok(response);
     }
 

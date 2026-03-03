@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using SamplePaymentsForOrders.Common;
 using SamplePaymentsForOrders.Contexts;
@@ -12,7 +13,8 @@ namespace SamplePaymentsForOrders.Services;
 
 public class RegisterUserService(
     ApplicationDbContext dbContext,
-    IDateTimeService dateTimeService) : IRegisterUserService
+    IDateTimeService dateTimeService,
+    IDistributedLockProvider distributedLockProvider) : IRegisterUserService
 {
     private const short MaxAttempt = 5;
     private const short MaxTryIn30Minutes = 3;
@@ -59,6 +61,14 @@ public class RegisterUserService(
 
     public async Task SendOtpCode(SendOtpCodeRequestDto request, CancellationToken cancellationToken)
     {
+        await using var distributedLock = await distributedLockProvider
+            .TryAcquireLockAsync($"send-otp-code-lock-{request.PhoneNumber}", cancellationToken: cancellationToken);
+
+        if (distributedLock == null)
+        {
+            throw new AppLogicException(ExceptionStatus.Conflict, "For ths phone number already sending otp code is in process.");
+        }
+        
         var otpCodes = await dbContext.OtpCodes
             .Where(o => o.PhoneNumber == request.PhoneNumber 
                         && o.CreatedAt < dateTimeService.UtcNow.AddMinutes(30))
